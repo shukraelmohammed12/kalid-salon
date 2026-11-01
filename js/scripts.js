@@ -110,57 +110,54 @@ window.addEventListener('DOMContentLoaded', event => {
         });
     }
 
-    // ── Booking Form — EmailJS ────────────────────────────────────
-    // HOW TO SET UP (one-time, free):
-    //  1. Sign up at https://www.emailjs.com
-    //  2. Add an Email Service (Gmail) → copy the Service ID below
-    //  3. Create an Email Template with these variables:
-    //       {{from_name}}, {{from_phone}}, {{service}}, {{message}}
-    //     Set "To Email" to shukraelmohammed32@gmail.com
-    //  4. Copy the Template ID below
-    //  5. Go to Account → API Keys → copy your Public Key below
-    // ─────────────────────────────────────────────────────────────
-    const EMAILJS_PUBLIC_KEY  = 'YOUR_PUBLIC_KEY';   // ← paste here
-    const EMAILJS_SERVICE_ID  = 'YOUR_SERVICE_ID';   // ← paste here
-    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';  // ← paste here
-
+    // ── Booking Form — Neon database API ─────────────────────────
     const bookingForm = document.getElementById('bookingForm');
     const submitBtn   = document.getElementById('submitBtn');
     const feedback    = document.getElementById('formFeedback');
     const btnText     = submitBtn  ? submitBtn.querySelector('.btn-text')    : null;
     const btnSpinner  = submitBtn  ? submitBtn.querySelector('.btn-spinner') : null;
 
-    if (bookingForm && window.emailjs) {
-        emailjs.init(EMAILJS_PUBLIC_KEY);
-
-        bookingForm.addEventListener('submit', function (e) {
+    if (bookingForm) {
+        bookingForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
-            // Basic validation
-            const name    = document.getElementById('name').value.trim();
-            const phone   = document.getElementById('phone').value.trim();
+            const name = document.getElementById('name').value.trim();
+            const phone = document.getElementById('phone').value.trim();
             const service = document.getElementById('service').value;
 
-            if (!name || !phone || !service || service === '') {
+            if (!name || !phone || !service) {
                 showFeedback('error', 'Please fill in your name, phone, and choose a service.');
                 return;
             }
 
-            // Show loading state
             setLoading(true);
             hideFeedback();
 
-            emailjs.sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, bookingForm)
-                .then(function () {
-                    setLoading(false);
-                    showFeedback('success', '✅ Booking request sent! We\'ll contact you shortly.');
-                    bookingForm.reset();
-                })
-                .catch(function (error) {
-                    setLoading(false);
-                    console.error('EmailJS error:', error);
-                    showFeedback('error', '❌ Something went wrong. Please call us at +251 93 997 5547.');
+            try {
+                const response = await fetch(bookingForm.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from_name: name,
+                        from_phone: phone,
+                        service,
+                        message: document.getElementById('message').value.trim()
+                    })
                 });
+                const result = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Booking request failed.');
+                }
+
+                showFeedback('success', '✅ Booking request received! We\'ll contact you shortly.');
+                bookingForm.reset();
+            } catch (error) {
+                console.error('Booking error:', error);
+                showFeedback('error', '❌ We could not save your booking. Please call us at +251 93 997 5547.');
+            } finally {
+                setLoading(false);
+            }
         });
     }
 

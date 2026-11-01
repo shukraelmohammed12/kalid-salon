@@ -189,7 +189,7 @@ body.dark-mode .navbar-toggler-icon {
   position: relative;
   background:
     var(--studio-hero-overlay),
-    url("https://images.unsplash.com/photo-1622287162716-f311baa1a2b8?auto=format&fit=crop&w=1800&q=80");
+    url("../image/hero-panel.jpg");
   background-size: cover;
   background-position: center top;
 }
