@@ -24,3 +24,15 @@ This is the Kalid Barber Studio website with a small Neon database backend for c
 The booking form saves the customer's name, phone, selected service, message, status, and submission time in the `bookings` table. The API endpoint is `POST /api/bookings`, and `GET /api/health` checks the database connection.
 
 Never put `DATABASE_URL` in browser JavaScript or commit `.env` to Git.
+
+## Deploy to Vercel with Neon
+
+This project is ready to deploy as an Express application on Vercel, with Neon providing PostgreSQL.
+
+1. Push the project to GitHub and import the repository into Vercel.
+2. In Vercel project settings, add `DATABASE_URL` using the pooled Neon connection string. Add `DATABASE_URL_UNPOOLED` only if you plan to run database setup from a deployment shell.
+3. Select Production and Preview for the environment variables, then redeploy.
+4. Run `npm run db:setup` once using the direct/unpooled connection string, or run the SQL in `db/schema.sql` from the Neon SQL Editor.
+5. Verify the deployment at `/api/health`; it should return `{ "ok": true }`.
+
+Static website files are stored in `public/` because Vercel serves that directory through its CDN. `server.js` exports the Express app for Vercel and starts a local listener only when running `npm start` outside Vercel.

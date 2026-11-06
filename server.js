@@ -4,6 +4,9 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { neon } from '@neondatabase/serverless';
 
+// Load local development secrets when present. Vercel injects its own
+// environment variables at runtime, and dotenv will not overwrite them.
+dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -78,11 +81,19 @@ app.post('/api/bookings', async (req, res) => {
     }
 });
 
-app.use(express.static(__dirname));
+// Vercel serves files from /public through its CDN. This middleware keeps the
+// same static-file behavior when running locally with `npm start`.
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(port, () => {
-    console.log(`Kalid Barber Studio running at http://localhost:${port}`);
-    if (!sql) {
-        console.warn('DATABASE_URL is missing. Add it to .env before saving bookings.');
-    }
-});
+// Vercel imports the Express app as a serverless function. Start a local
+// listener only when running outside Vercel.
+if (!process.env.VERCEL) {
+    app.listen(port, () => {
+        console.log(`Kalid Barber Studio running at http://localhost:${port}`);
+        if (!sql) {
+            console.warn('DATABASE_URL is missing. Add it to .env before saving bookings.');
+        }
+    });
+}
+
+export default app;
