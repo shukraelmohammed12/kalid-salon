@@ -9,6 +9,11 @@ const stats = document.getElementById('stats');
 const refreshButton = document.getElementById('refreshButton');
 const logoutButton = document.getElementById('logoutButton');
 const statuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+const apiBaseUrl = String(window.KALID_API_URL || '').replace(/\/$/, '');
+
+function apiUrl(path) {
+    return `${apiBaseUrl}${path}`;
+}
 
 function showFeedback(element, message, isError = false) {
     element.textContent = message;
@@ -85,7 +90,7 @@ async function loadBookings() {
     refreshButton.disabled = true;
 
     try {
-        const response = await fetch('/api/admin/bookings');
+        const response = await fetch(apiUrl('/api/admin/bookings'), { credentials: 'include' });
         const result = await response.json().catch(() => ({}));
         if (response.status === 401) {
             showLogin();
@@ -118,9 +123,10 @@ loginForm.addEventListener('submit', async (event) => {
     button.disabled = true;
 
     try {
-        const response = await fetch('/api/admin/login', {
+        const response = await fetch(apiUrl('/api/admin/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ password: document.getElementById('password').value })
         });
         const result = await response.json().catch(() => ({}));
@@ -140,9 +146,10 @@ bookingRows.addEventListener('change', async (event) => {
     select.disabled = true;
 
     try {
-        const response = await fetch(`/api/admin/bookings/${select.dataset.bookingId}`, {
+        const response = await fetch(apiUrl(`/api/admin/bookings/${select.dataset.bookingId}`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ status: select.value })
         });
         const result = await response.json().catch(() => ({}));
@@ -161,11 +168,11 @@ bookingRows.addEventListener('change', async (event) => {
 refreshButton.addEventListener('click', loadBookings);
 
 logoutButton.addEventListener('click', async () => {
-    await fetch('/api/admin/logout', { method: 'POST' });
+    await fetch(apiUrl('/api/admin/logout'), { method: 'POST', credentials: 'include' });
     showLogin();
 });
 
-fetch('/api/admin/session')
+fetch(apiUrl('/api/admin/session'), { credentials: 'include' })
     .then((response) => response.json())
     .then((result) => result.authenticated ? showDashboard() : showLogin())
     .catch(() => showLogin());

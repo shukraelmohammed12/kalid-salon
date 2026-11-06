@@ -46,3 +46,21 @@ This project is ready to deploy as an Express application on Vercel, with Neon p
 Static website files are stored in `public/` because Vercel serves that directory through its CDN. `server.js` exports the Express app for Vercel and starts a local listener only when running `npm start` outside Vercel.
 
 The admin session is an expiring, signed HttpOnly cookie. The password and session secret stay server-side and are never sent to the browser.
+
+## Separate Vercel frontend and Render backend
+
+For a Render backend, configure these Render environment variables:
+
+- `DATABASE_URL`: Neon pooled connection string
+- `DATABASE_URL_UNPOOLED`: Neon direct connection string for `npm run db:setup`
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
+- `FRONTEND_ORIGIN`: exact Vercel URL, for example `https://your-site.vercel.app`
+
+Set the Render service start command to `npm start`. After deployment, verify
+`https://your-backend.onrender.com/api/health` returns `{ "ok": true }`.
+
+Before deploying the Vercel frontend, edit `public/api-config.js` and set
+`window.KALID_API_URL` to the Render service URL without a trailing slash,
+for example `https://your-backend.onrender.com`. Redeploy Vercel after changing
+that file.

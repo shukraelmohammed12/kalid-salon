@@ -16,6 +16,12 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const databaseUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED;
 const sql = databaseUrl ? neon(databaseUrl) : null;
+const allowedOrigins = new Set(
+    String(process.env.FRONTEND_ORIGIN || 'http://localhost:3000')
+        .split(',')
+        .map((origin) => origin.trim().replace(/\/$/, ''))
+        .filter(Boolean)
+);
 const adminCookieName = 'kalid_admin_session';
 const adminSessionTtlMs = 8 * 60 * 60 * 1000;
 const allowedStatuses = new Set(['pending', 'confirmed', 'completed', 'cancelled']);
@@ -27,6 +33,25 @@ const allowedServices = new Set([
 ]);
 
 app.use(express.json({ limit: '10kb' }));
+app.use((req, res, next) => {
+    const origin = String(req.headers.origin || '').replace(/\/$/, '');
+
+    if (origin && allowedOrigins.has(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+        res.setHeader('Vary', 'Origin');
+    }
+
+    if (req.method === 'OPTIONS') {
+        return origin && allowedOrigins.has(origin)
+            ? res.sendStatus(204)
+            : res.sendStatus(403);
+    }
+
+    return next();
+});
 
 function safeEqual(left, right) {
     const leftBuffer = Buffer.from(String(left));
@@ -171,7 +196,7 @@ app.post('/api/admin/login', (req, res) => {
     const cookieParts = [
         `${adminCookieName}=${createAdminSession()}`,
         'HttpOnly',
-        'SameSite=Strict',
+        secureCookie ? 'SameSite=None' : 'SameSite=Strict',
         'Path=/',
         `Max-Age=${adminSessionTtlMs / 1000}`
     ];
@@ -185,7 +210,10 @@ app.post('/api/admin/login', (req, res) => {
 });
 
 app.post('/api/admin/logout', (_req, res) => {
-    res.setHeader('Set-Cookie', `${adminCookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+    const sameSite = process.env.VERCEL || process.env.NODE_ENV === 'production'
+        ? 'SameSite=None; Secure'
+        : 'SameSite=Strict';
+    res.setHeader('Set-Cookie', `${adminCookieName}=; HttpOnly; ${sameSite}; Path=/; Max-Age=0`);
     return res.json({ ok: true });
 });
 

@@ -116,6 +116,7 @@ window.addEventListener('DOMContentLoaded', event => {
     const feedback    = document.getElementById('formFeedback');
     const btnText     = submitBtn  ? submitBtn.querySelector('.btn-text')    : null;
     const btnSpinner  = submitBtn  ? submitBtn.querySelector('.btn-spinner') : null;
+    const apiBaseUrl  = String(window.KALID_API_URL || '').replace(/\/$/, '');
 
     if (bookingForm) {
         bookingForm.addEventListener('submit', async function (e) {
@@ -134,7 +135,7 @@ window.addEventListener('DOMContentLoaded', event => {
             hideFeedback();
 
             try {
-                const response = await fetch(bookingForm.action, {
+                const response = await fetch(`${apiBaseUrl}${bookingForm.action}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
