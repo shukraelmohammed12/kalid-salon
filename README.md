@@ -35,4 +35,9 @@ This project is ready to deploy as an Express application on Vercel, with Neon p
 4. Run `npm run db:setup` once using the direct/unpooled connection string, or run the SQL in `db/schema.sql` from the Neon SQL Editor.
 5. Verify the deployment at `/api/health`; it should return `{ "ok": true }`.
 
+6. Add `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` to Vercel Production and Preview environment variables.
+7. Open `/admin` to sign in and manage booking statuses.
+
 Static website files are stored in `public/` because Vercel serves that directory through its CDN. `server.js` exports the Express app for Vercel and starts a local listener only when running `npm start` outside Vercel.
+
+The admin session is an expiring, signed HttpOnly cookie. The password and session secret stay server-side and are never sent to the browser.

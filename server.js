@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import dotenv from 'dotenv';
 import { neon } from '@neondatabase/serverless';
@@ -14,6 +15,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const adminCookieName = 'kalid_admin_session';
+const adminSessionTtlMs = 8 * 60 * 60 * 1000;
+const allowedStatuses = new Set(['pending', 'confirmed', 'completed', 'cancelled']);
 const allowedServices = new Set([
     'Haircut & Styling',
     'Beard Sculpting',
@@ -22,6 +26,68 @@ const allowedServices = new Set([
 ]);
 
 app.use(express.json({ limit: '10kb' }));
+
+function safeEqual(left, right) {
+    const leftBuffer = Buffer.from(String(left));
+    const rightBuffer = Buffer.from(String(right));
+
+    return leftBuffer.length === rightBuffer.length
+        && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function createAdminSession() {
+    const issuedAt = String(Date.now());
+    const signature = createHmac('sha256', process.env.ADMIN_SESSION_SECRET)
+        .update(issuedAt)
+        .digest('base64url');
+
+    return `${issuedAt}.${signature}`;
+}
+
+function getAdminSession(req) {
+    const cookies = String(req.headers.cookie || '')
+        .split(';')
+        .map((cookie) => cookie.trim());
+    const sessionCookie = cookies.find((cookie) => cookie.startsWith(`${adminCookieName}=`));
+
+    if (!sessionCookie || !process.env.ADMIN_SESSION_SECRET) {
+        return null;
+    }
+
+    const token = sessionCookie.slice(`${adminCookieName}=`.length);
+    const [issuedAt, signature] = token.split('.');
+    const issuedAtMs = Number(issuedAt);
+
+    if (!issuedAt || !signature || !Number.isFinite(issuedAtMs)) {
+        return null;
+    }
+
+    if (Date.now() - issuedAtMs > adminSessionTtlMs || issuedAtMs > Date.now() + 60_000) {
+        return null;
+    }
+
+    const expectedSignature = createHmac('sha256', process.env.ADMIN_SESSION_SECRET)
+        .update(issuedAt)
+        .digest('base64url');
+
+    return safeEqual(signature, expectedSignature) ? { issuedAt: issuedAtMs } : null;
+}
+
+function adminIsConfigured() {
+    return Boolean(process.env.ADMIN_PASSWORD && process.env.ADMIN_SESSION_SECRET);
+}
+
+function requireAdmin(req, res, next) {
+    if (!adminIsConfigured()) {
+        return res.status(503).json({ ok: false, error: 'Admin access is not configured.' });
+    }
+
+    if (!getAdminSession(req)) {
+        return res.status(401).json({ ok: false, error: 'Admin login required.' });
+    }
+
+    return next();
+}
 
 app.get('/api/health', async (_req, res) => {
     if (!sql) {
@@ -79,6 +145,107 @@ app.post('/api/bookings', async (req, res) => {
         console.error('Booking insert failed:', error);
         return res.status(500).json({ ok: false, error: 'Could not save the booking.' });
     }
+});
+
+app.post('/api/admin/login', (req, res) => {
+    if (!adminIsConfigured()) {
+        return res.status(503).json({ ok: false, error: 'Admin access is not configured.' });
+    }
+
+    const password = String(req.body?.password || '');
+
+    if (!safeEqual(password, process.env.ADMIN_PASSWORD)) {
+        return res.status(401).json({ ok: false, error: 'Incorrect admin password.' });
+    }
+
+    const secureCookie = process.env.VERCEL || process.env.NODE_ENV === 'production';
+    const cookieParts = [
+        `${adminCookieName}=${createAdminSession()}`,
+        'HttpOnly',
+        'SameSite=Strict',
+        'Path=/',
+        `Max-Age=${adminSessionTtlMs / 1000}`
+    ];
+
+    if (secureCookie) {
+        cookieParts.push('Secure');
+    }
+
+    res.setHeader('Set-Cookie', cookieParts.join('; '));
+    return res.json({ ok: true });
+});
+
+app.post('/api/admin/logout', (_req, res) => {
+    res.setHeader('Set-Cookie', `${adminCookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+    return res.json({ ok: true });
+});
+
+app.get('/api/admin/session', (req, res) => {
+    if (!adminIsConfigured()) {
+        return res.status(503).json({ ok: false, authenticated: false, error: 'Admin access is not configured.' });
+    }
+
+    return res.json({ ok: true, authenticated: Boolean(getAdminSession(req)) });
+});
+
+app.get('/api/admin/bookings', requireAdmin, async (_req, res) => {
+    if (!sql) {
+        return res.status(503).json({ ok: false, error: 'Database is not configured yet.' });
+    }
+
+    try {
+        const bookings = await sql`
+            SELECT id, customer_name, phone, service, message, status, created_at
+            FROM bookings
+            ORDER BY created_at DESC
+            LIMIT 500
+        `;
+
+        return res.json({ ok: true, bookings });
+    } catch (error) {
+        console.error('Admin booking list failed:', error);
+        return res.status(500).json({ ok: false, error: 'Could not load bookings.' });
+    }
+});
+
+app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
+    if (!sql) {
+        return res.status(503).json({ ok: false, error: 'Database is not configured yet.' });
+    }
+
+    const id = Number.parseInt(req.params.id, 10);
+    const status = String(req.body?.status || '').trim();
+
+    if (!Number.isSafeInteger(id) || id < 1) {
+        return res.status(400).json({ ok: false, error: 'Invalid booking ID.' });
+    }
+
+    if (!allowedStatuses.has(status)) {
+        return res.status(400).json({ ok: false, error: 'Invalid booking status.' });
+    }
+
+    try {
+        const [booking] = await sql`
+            UPDATE bookings
+            SET status = ${status}
+            WHERE id = ${id}
+            RETURNING id, customer_name, phone, service, message, status, created_at
+        `;
+
+        if (!booking) {
+            return res.status(404).json({ ok: false, error: 'Booking not found.' });
+        }
+
+        return res.json({ ok: true, booking });
+    } catch (error) {
+        console.error('Admin booking update failed:', error);
+        return res.status(500).json({ ok: false, error: 'Could not update booking.' });
+    }
+});
+
+// Friendly admin URL for both local development and Vercel deployments.
+app.get('/admin', (_req, res) => {
+    return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // Vercel serves files from /public through its CDN. This middleware keeps the

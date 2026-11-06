@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin | Kalid Barber Studio</title>
+    <link rel="stylesheet" href="/admin.css" />
+</head>
+<body>
+    <main class="shell">
+        <section id="loginPanel" class="panel login-panel">
+            <p class="eyebrow">Kalid Barber Studio</p>
+            <h1>Booking admin</h1>
+            <p class="muted">Sign in to view and manage customer booking requests.</p>
+            <form id="loginForm">
+                <label for="password">Admin password</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" required />
+                <button type="submit">Sign in</button>
+                <p id="loginFeedback" class="feedback" role="alert"></p>
+            </form>
+            <a class="back-link" href="/">← Back to website</a>
+        </section>
+
+        <section id="dashboardPanel" class="dashboard" hidden>
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Kalid Barber Studio</p>
+                    <h1>Booking dashboard</h1>
+                </div>
+                <div class="topbar-actions">
+                    <a class="button button-secondary" href="/">View website</a>
+                    <button id="logoutButton" class="button button-secondary" type="button">Sign out</button>
+                </div>
+            </header>
+
+            <div id="stats" class="stats" aria-live="polite"></div>
+
+            <section class="panel table-panel">
+                <div class="table-heading">
+                    <div>
+                        <h2>Customer bookings</h2>
+                        <p class="muted">Update a booking status after you contact the customer.</p>
+                    </div>
+                    <button id="refreshButton" class="button button-secondary" type="button">Refresh</button>
+                </div>
+                <p id="dashboardFeedback" class="feedback" role="status"></p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Service</th>
+                                <th>Message</th>
+                                <th>Received</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingRows"></tbody>
+                    </table>
+                </div>
+                <p id="emptyState" class="empty" hidden>No bookings yet.</p>
+            </section>
+        </section>
+    </main>
+    <script src="/admin.js"></script>
+</body>
+</html>
