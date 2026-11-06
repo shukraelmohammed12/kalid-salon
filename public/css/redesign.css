@@ -752,6 +752,21 @@ body.dark-mode .form-feedback--error {
   font-size: 0.82rem;
 }
 
+.footer .admin-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: rgba(205, 212, 205, 0.65);
+  font-size: 0.75rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer .admin-link:hover,
+.footer .admin-link:focus-visible {
+  color: var(--studio-accent-deep);
+  text-decoration: underline;
+}
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 991.98px) {
   .masthead {
