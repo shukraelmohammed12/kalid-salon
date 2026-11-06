@@ -14,7 +14,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3000);
-const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const databaseUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED;
+const sql = databaseUrl ? neon(databaseUrl) : null;
 const adminCookieName = 'kalid_admin_session';
 const adminSessionTtlMs = 8 * 60 * 60 * 1000;
 const allowedStatuses = new Set(['pending', 'confirmed', 'completed', 'cancelled']);
@@ -95,7 +96,15 @@ app.get('/api/health', async (_req, res) => {
     }
 
     try {
-        await sql`SELECT 1`;
+        const [database] = await sql`
+            SELECT to_regclass('public.bookings') AS bookings_table
+        `;
+
+        if (database.bookings_table !== 'bookings') {
+            console.error('Database health check failed: public.bookings does not exist.');
+            return res.status(503).json({ ok: false, error: 'Database schema is not ready.' });
+        }
+
         return res.json({ ok: true });
     } catch (error) {
         console.error('Database health check failed:', error);

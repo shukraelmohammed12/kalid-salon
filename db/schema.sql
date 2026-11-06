@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS bookings (
     phone VARCHAR(30) NOT NULL,
     service VARCHAR(100) NOT NULL,
     message TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
