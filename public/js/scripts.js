@@ -155,7 +155,7 @@ window.addEventListener('DOMContentLoaded', event => {
                 bookingForm.reset();
             } catch (error) {
                 console.error('Booking error:', error);
-                showFeedback('error', '❌ We could not save your booking. Please call us at +251 93 997 5547.');
+                showFeedback('error', `❌ ${error.message || 'We could not save your booking. Please call us at +251 93 997 5547.'}`);
             } finally {
                 setLoading(false);
             }

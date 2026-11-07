@@ -33,6 +33,31 @@ const allowedServices = new Set([
     'Complete Package'
 ]);
 
+async function ensureDatabaseSchema() {
+    if (!sql) return;
+
+    await sql`
+        CREATE TABLE IF NOT EXISTS bookings (
+            id BIGSERIAL PRIMARY KEY,
+            customer_name VARCHAR(100) NOT NULL,
+            phone VARCHAR(30) NOT NULL,
+            service VARCHAR(100) NOT NULL,
+            message TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS message TEXT`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`;
+    await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
+}
+
+const databaseReady = ensureDatabaseSchema().catch((error) => {
+    console.error('Database schema setup failed:', error);
+    return error;
+});
+
 app.use(express.json({ limit: '10kb' }));
 app.use((req, res, next) => {
     const origin = String(req.headers.origin || '').replace(/\/$/, '');
@@ -122,6 +147,11 @@ app.get('/api/health', async (_req, res) => {
     }
 
     try {
+        const schemaError = await databaseReady;
+        if (schemaError) {
+            return res.status(503).json({ ok: false, error: 'Database schema is not ready.' });
+        }
+
         const [database] = await sql`
             SELECT to_regclass('public.bookings') AS bookings_table
         `;
@@ -165,6 +195,11 @@ app.post('/api/bookings', async (req, res) => {
     }
 
     try {
+        const schemaError = await databaseReady;
+        if (schemaError) {
+            return res.status(503).json({ ok: false, error: 'Database schema is not ready.' });
+        }
+
         const [booking] = await sql`
             INSERT INTO bookings (customer_name, phone, service, message)
             VALUES (${name}, ${phone}, ${service}, ${message || null})
@@ -177,8 +212,12 @@ app.post('/api/bookings', async (req, res) => {
             createdAt: booking.created_at
         });
     } catch (error) {
-        console.error('Booking insert failed:', error);
-        return res.status(500).json({ ok: false, error: 'Could not save the booking.' });
+        const errorId = Date.now().toString(36);
+        console.error(`Booking insert failed [${errorId}]:`, error);
+        return res.status(500).json({
+            ok: false,
+            error: `Could not save the booking. Error ID: ${errorId}`
+        });
     }
 });
 
