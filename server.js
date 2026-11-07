@@ -16,6 +16,7 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const databaseUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED;
 const sql = databaseUrl ? neon(databaseUrl) : null;
+const backendOnly = process.env.BACKEND_ONLY === 'true';
 const allowedOrigins = new Set(
     String(process.env.FRONTEND_ORIGIN || 'http://localhost:3000')
         .split(',')
@@ -280,14 +281,24 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
     }
 });
 
-// Friendly admin URL for both local development and Vercel deployments.
-app.get('/admin', (_req, res) => {
-    return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
+if (!backendOnly) {
+    // Friendly admin URL for local development and Vercel deployments.
+    app.get('/admin', (_req, res) => {
+        return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    });
 
-// Vercel serves files from /public through its CDN. This middleware keeps the
-// same static-file behavior when running locally with `npm start`.
-app.use(express.static(path.join(__dirname, 'public')));
+    // Vercel serves files from /public through its CDN. This middleware keeps
+    // the same static-file behavior when running locally with `npm start`.
+    app.use(express.static(path.join(__dirname, 'public')));
+} else {
+    app.get('/', (_req, res) => {
+        return res.json({
+            ok: true,
+            service: 'Kalid Barber Studio API',
+            health: '/api/health'
+        });
+    });
+}
 
 // Vercel imports the Express app as a serverless function. Start a local
 // listener only when running outside Vercel.

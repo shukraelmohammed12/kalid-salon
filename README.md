@@ -56,9 +56,12 @@ For a Render backend, configure these Render environment variables:
 - `ADMIN_PASSWORD`
 - `ADMIN_SESSION_SECRET`
 - `FRONTEND_ORIGIN`: exact Vercel URL, for example `https://your-site.vercel.app`
+- `BACKEND_ONLY=true`: prevents Render from serving the website UI
 
 Set the Render service start command to `npm start`. After deployment, verify
 `https://your-backend.onrender.com/api/health` returns `{ "ok": true }`.
+The Render root URL will return API service information only; the website remains
+available from Vercel.
 
 Before deploying the Vercel frontend, edit `public/api-config.js` and set
 `window.KALID_API_URL` to the Render service URL without a trailing slash,
